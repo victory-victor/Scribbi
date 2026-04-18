@@ -65,7 +65,7 @@ async function generateWord() {
 
         do {
             const result = await model.generateContent(
-                `Give one simple word for a drawing game it can be a non living thing or a living thing also don't repeat the words for next 5 times. Only return ONE word.`
+                `Give one simple word for a drawing game it can be a non living thing or a living thing also don't repeat the words for next Provide one fresh, simple, and visually distinct word for a drawing game. Choose something that can be easily sketched and quickly recognized (like everyday objects, animals, or common things). Avoid abstract ideas, brand names, or multi-word phrases. Output only the word, nothing else.5 times. Only return ONE word.`
             );
 
             word = result.response.text().trim();
