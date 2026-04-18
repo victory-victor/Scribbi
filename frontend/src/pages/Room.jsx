@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { useLocation } from "react-router-dom";
 import socket from "../socket";
 import gsap from "gsap";
+// import FloatingEmoji from "./FloatingEmoji";
 
 function Room() {
     const canvasRef = useRef(null);
     const chatEndRef = useRef(null);
     const location = useLocation();
-    const username = location.state?.name;
+    const username = localStorage.getItem("username");
     const [message, setMessage] = useState("");
     const [chat, setChat] = useState([]);
     const [isDrawer, setIsDrawer] = useState(false);
@@ -19,6 +20,48 @@ function Room() {
     const [color, setColor] = useState("#000000");
     const [brushSize, setBrushSize] = useState(5);
     const [emojis, setEmojis] = useState([]);
+
+    const FloatingEmoji = ({ emoji }) => {
+        const emojiRef = useRef(null);
+
+        useEffect(() => {
+            // Random horizontal start position and rotation
+            const randomX = Math.random() * 100 - 50; // -50 to 50
+            const randomRotate = Math.random() * 40 - 20;
+
+            gsap.fromTo(emojiRef.current,
+                {
+                    y: 0,
+                    x: randomX,
+                    opacity: 0,
+                    scale: 0.5,
+                    rotate: 0
+                },
+                {
+                    y: -400, // Float up
+                    x: randomX + (Math.random() * 100 - 50), // Slight sway
+                    opacity: 1,
+                    scale: 2,
+                    rotate: randomRotate,
+                    duration: 2,
+                    ease: "power1.out",
+                    onComplete: () => {
+                        gsap.to(emojiRef.current, { opacity: 0, duration: 0.5 });
+                    }
+                }
+            );
+        }, []);
+
+        return (
+            <div
+                ref={emojiRef}
+                className="absolute bottom-10 left-1/2 text-4xl select-none"
+                style={{ willChange: 'transform, opacity' }}
+            >
+                {emoji}
+            </div>
+        );
+    };
 
     // Helper for 00:60 format
     const formatTime = (seconds) => {
@@ -142,8 +185,13 @@ function Room() {
             localStorage.removeItem("username");
         });
         socket.on("receive_emoji", ({ emoji }) => {
-            setEmojis((prev) => [...prev, { emoji, id: Date.now() }]);
-            setTimeout(() => setEmojis((prev) => prev.slice(1)), 2000);
+            const id = Date.now() + Math.random(); // Unique ID
+            setEmojis((prev) => [...prev, { emoji, id }]);
+
+            // Remove specifically this emoji after animation finishes
+            setTimeout(() => {
+                setEmojis((prev) => prev.filter(e => e.id !== id));
+            }, 2500);
         });
         socket.on("restart_game", () => {
             setGameOver(false); setChat([]); setWord(""); setTimer(60);
@@ -153,8 +201,9 @@ function Room() {
 
     useEffect(() => {
         const username = localStorage.getItem("username");
+        const joined = localStorage.getItem("joined");
 
-        if (!username) {
+        if (!username || !joined) {
             window.location.href = "/";
         }
     }, []);
@@ -236,9 +285,9 @@ function Room() {
                 {/* 3. PLAYER COUNT */}
                 <div className="order-2 md:order-3 flex items-center gap-2 bg-[#1a1a20] px-3 py-2 md:px-4 md:py-2 rounded-2xl border border-white/10 shadow-lg">
                     <div className="hidden sm:flex -space-x-2">
-                        {players.slice(0, 3).map(p => (
-                            <div key={p.id} className="w-6 h-6 rounded-full border-2 border-[#1a1a20] bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[8px] font-black uppercase text-white shadow-md">
-                                {p.name[0]}
+                        {players.slice(0, 3).map((p, index) => (
+                            <div key={p?.id || index} className="w-6 h-6 rounded-full border-2 border-[#1a1a20] bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[8px] font-black uppercase text-white shadow-md">
+                                {p?.name?.[0] || "?"}
                             </div>
                         ))}
                     </div>
@@ -267,6 +316,11 @@ function Room() {
 
             {/* 3. CANVAS ARENA */}
             <main className="grow relative bg-[#0f0f13] p-4 flex flex-col items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
+                    {emojis.map((e) => (
+                        <FloatingEmoji key={e.id} emoji={e.emoji} />
+                    ))}
+                </div>
                 <div className="canvas-container w-full h-full max-w-5xl bg-white rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.6)] relative overflow-hidden ring-4 ring-[#1a1a20]">
                     <canvas
                         ref={canvasRef}
@@ -373,17 +427,32 @@ function Room() {
                         <span className="text-indigo-500 font-black tracking-tight text-[20px] block mb-2 text-center uppercase">Round Over</span>
                         <h2 className="text-white font-black text-3xl mb-8 text-center uppercase italic">The Winner's Circle</h2>
                         <div className="space-y-4 mb-10">
-                            {players.sort((a, b) => b.score - a.score).map((p, i) => (
-                                <div key={p.id} className={`flex justify-between items-center p-4 rounded-2xl ${i === 0 ? 'bg-indigo-600 ring-4 ring-indigo-400/20' : 'bg-white/5 opacity-70'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-black text-xs text-white/50">{i + 1}</span>
-                                        <span className="font-black text-sm uppercase">{p.name}</span>
+                            {[...players]
+                                .sort((a, b) => (b?.score || 0) - (a?.score || 0))
+                                .map((p, i) => (
+                                    <div key={p.id} className={`flex justify-between items-center p-4 rounded-2xl ${i === 0 ? 'bg-indigo-600 ring-4 ring-indigo-400/20' : 'bg-white/5 opacity-70'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-black text-xs text-white/50">{i + 1}</span>
+                                            <span className="font-black text-sm uppercase">{p.name}</span>
+                                        </div>
+                                        <span className="font-mono font-black text-lg">{p.score}</span>
                                     </div>
-                                    <span className="font-mono font-black text-lg">{p.score}</span>
-                                </div>
-                            ))}
+                                ))}
                         </div>
-                        <button onClick={() => socket.emit("play_again")} className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all transform active:scale-95 shadow-xl">Start Rematch</button>
+                        <button
+                            onClick={() => {
+                                socket.emit("leave_room");
+                                socket.disconnect();
+
+                                localStorage.removeItem("username");
+                                localStorage.removeItem("joined");
+
+                                window.location.href = "/"; // redirect to home
+                            }}
+                            className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-rose-600 transition-all transform active:scale-95 shadow-xl"
+                        >
+                            Leave Game
+                        </button>
                     </div>
                 </div>
             )}

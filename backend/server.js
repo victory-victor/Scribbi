@@ -50,7 +50,7 @@ let gameRestarting = false;
 let lastWords = [];
 
 app.get("/", (req, res) => {
-  res.send("Server is running 🚀");
+    res.send("Server is running 🚀");
 });
 
 async function generateWord() {
@@ -309,6 +309,11 @@ io.on("connection", (socket) => {
         setTimeout(() => {
             gameRestarting = false;
         }, 2000);
+    });
+
+    socket.on("leave_room", () => {
+        socket.leave("room");
+        socket.disconnect();
     });
 });
 
