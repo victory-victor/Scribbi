@@ -20,6 +20,7 @@ function Room() {
     const [color, setColor] = useState("#000000");
     const [brushSize, setBrushSize] = useState(5);
     const [emojis, setEmojis] = useState([]);
+    const [toast, setToast] = useState(null);
 
     const FloatingEmoji = ({ emoji }) => {
         const emojiRef = useRef(null);
@@ -63,6 +64,14 @@ function Room() {
         );
     };
 
+    const showToast = (msg, type = "info") => {
+        setToast({ msg, type });
+
+        setTimeout(() => {
+            setToast(null);
+        }, 3000);
+    };
+
     // Helper for 00:60 format
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -90,10 +99,15 @@ function Room() {
     };
 
     useEffect(() => {
+        if (gameOver) return;
         socket.connect();
         socket.emit("join_room", { username });
         socket.on("room_update", (playersList) => { setPlayers(playersList); });
-        socket.on("room_full", () => { alert("Room is full"); });
+        socket.on("room_full", () => {
+            if (!gameOver) { // 🚨 ignore if game already ended
+                showToast("Room is full 🚫", "error");
+            }
+        });
         socket.on("receive_message", (data) => { setChat((prev) => [...prev, data]); });
         socket.on("correct_guess", (data) => {
             setChat((prev) => [...prev, { ...data, correct: true }]);
@@ -119,7 +133,7 @@ function Room() {
             });
         });
         return () => { socket.off(); };
-    }, [username]);
+    }, [username, gameOver]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -181,6 +195,7 @@ function Room() {
         socket.on("game_over", (players) => {
             setPlayers(players);
             setGameOver(true);
+            socket.disconnect();
             localStorage.removeItem("joined");
             localStorage.removeItem("username");
         });
@@ -456,7 +471,19 @@ function Room() {
                     </div>
                 </div>
             )}
-
+            {toast && (
+                <div className="fixed top-6 right-6 z-999 animate-slideIn">
+                    <div
+                        className={`px-6 py-4 rounded-2xl shadow-2xl border text-sm font-bold uppercase tracking-wide backdrop-blur-xl
+            ${toast.type === "error"
+                                ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                                : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                            }`}
+                    >
+                        {toast.msg}
+                    </div>
+                </div>
+            )}
             <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 input[type="range"] {
@@ -473,6 +500,20 @@ function Room() {
                     border-radius: 50%;
                     cursor: pointer;
                     border: 2px solid #fff;
+                }
+                @keyframes slideIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-20px) translateX(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) translateX(0);
+                    }
+                }
+
+                .animate-slideIn {
+                    animation: slideIn 0.3s ease-out;
                 }
             `}</style>
         </div>
