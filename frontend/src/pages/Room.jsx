@@ -40,7 +40,6 @@ function Room() {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chat]);
 
-    // --- LOGIC REMAINS UNTOUCHED ---
     const sendMessage = () => {
         if (!message.trim() || isDrawer) return;
         socket.emit("send_message", { username, message });
@@ -79,7 +78,6 @@ function Room() {
         return () => { socket.off(); };
     }, [username]);
 
-    // --- FIXED BRUSH & COORDINATE SYSTEM ---
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext("2d");
@@ -137,7 +135,12 @@ function Room() {
         socket.on("clear_canvas", () => {
             canvasRef.current.getContext("2d").clearRect(0, 0, 800, 500);
         });
-        socket.on("game_over", (players) => { setPlayers(players); setGameOver(true); });
+        socket.on("game_over", (players) => {
+            setPlayers(players);
+            setGameOver(true);
+            localStorage.removeItem("joined");
+            localStorage.removeItem("username");
+        });
         socket.on("receive_emoji", ({ emoji }) => {
             setEmojis((prev) => [...prev, { emoji, id: Date.now() }]);
             setTimeout(() => setEmojis((prev) => prev.slice(1)), 2000);
@@ -146,6 +149,14 @@ function Room() {
             setGameOver(false); setChat([]); setWord(""); setTimer(60);
             canvasRef.current.getContext("2d").clearRect(0, 0, 800, 500);
         });
+    }, []);
+
+    useEffect(() => {
+        const username = localStorage.getItem("username");
+
+        if (!username) {
+            window.location.href = "/";
+        }
     }, []);
 
     return (

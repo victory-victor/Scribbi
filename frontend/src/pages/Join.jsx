@@ -6,6 +6,8 @@ function Join() {
   const [name, setName] = useState("");
   const navigate = useNavigate();
   const boxRef = useRef(null);
+  localStorage.setItem("username", name);
+  localStorage.setItem("joined", "true");
 
   useLayoutEffect(() => {
     // Floating animation
